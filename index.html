@@ -1,210 +1,143 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Planning Website</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planner Login</title>
   <style>
-    body { font-family: sans-serif; margin: 20px; max-width: 600px; margin: auto; }
-    input, select, button, textarea { width: 100%; margin: 8px 0; padding: 10px; font-size: 16px; }
-    #adminPanel, #planningForm { display: none; }
-    button { cursor: pointer; }
+    body { font-family: Arial, sans-serif; background-color: #f0f0f0; padding: 20px; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, select, button { display: block; width: 100%; margin: 10px 0; padding: 10px; font-size: 16px; }
+    .admin-controls { border-top: 1px solid #ccc; margin-top: 20px; padding-top: 20px; }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h2>Login</h2>
+    <input type="text" id="loginUsername" placeholder="Username">
+    <input type="password" id="loginPassword" placeholder="Password">
+    <button onclick="login()">Login</button>
 
-  <h2>Login</h2>
-  <div id="loginSection">
-    <input type="text" id="username" placeholder="Gebruikersnaam" required>
-    <input type="password" id="password" placeholder="Wachtwoord" required>
-    <button onclick="login()">Inloggen</button>
-  </div>
+    <div id="adminPanel" style="display:none;">
+      <h2>Planner</h2>
+      <input type="text" placeholder="Roblox Username">
+      <input type="text" placeholder="Lijn + Nummer (bv. 3 + 130)">
+      <input type="text" placeholder="Bus Type">
+      <input type="text" placeholder="Van wanneer tot wanneer (bv. 15:00 - 17:00)">
+      <input type="text" placeholder="Extra info">
+      <button>Verstuur Rit</button>
 
-  <div id="planningForm">
-    <h2>Planning invullen</h2>
-    <input type="text" id="stelplaats" placeholder="Stelplaats">
-    <input type="text" id="tijd" placeholder="Van uur tot uur (bijv. 07:00 - 15:30)">
-    <input type="text" id="lijn" placeholder="Lijnnummer">
-    <input type="text" id="bus" placeholder="Busnummer of type">
-    <input type="text" id="roblox" placeholder="Roblox gebruikersnaam">
-    <textarea id="ritinfo" placeholder="Rit info of opmerkingen..."></textarea>
-    <button onclick="verstuurPlanning()">Verstuur planning</button>
-    <button onclick="logout()" style="background-color: #e74c3c; color: white;">Uitloggen</button>
-  </div>
+      <div class="admin-controls">
+        <h3>Admin Tools</h3>
+        <input type="text" placeholder="Nieuwe event naam" id="eventName">
+        <button onclick="startEvent()">Start Event</button>
 
-  <div id="adminPanel">
-    <h2>Admin: Gebruikersbeheer</h2>
-    <input type="text" id="newUsername" placeholder="Nieuwe gebruikersnaam">
-    <input type="password" id="newPassword" placeholder="Wachtwoord">
-    <label><input type="checkbox" id="isAdmin"> Admin rechten?</label>
-    <button onclick="maakGebruiker()">➕ Gebruiker aanmaken</button>
+        <h4>Accountbeheer</h4>
+        <input type="text" id="changeUser" placeholder="Gebruikersnaam om te wijzigen">
+        <input type="password" id="newPassword" placeholder="Nieuw wachtwoord">
+        <button onclick="changePassword()">Wachtwoord wijzigen</button>
 
-    <hr>
-    <input type="text" id="editUser" placeholder="Gebruikersnaam voor aanpassing">
-    <input type="password" id="editPassword" placeholder="Nieuw wachtwoord">
-    <button onclick="pasWachtwoordAan()">🔑 Wachtwoord aanpassen</button>
+        <input type="text" id="deleteUser" placeholder="Gebruiker verwijderen">
+        <button onclick="deleteAccount()">Verwijder account</button>
 
-    <input type="text" id="deleteUser" placeholder="Gebruikersnaam om te verwijderen">
-    <button onclick="verwijderGebruiker()">🗑️ Verwijder gebruiker</button>
+        <h4>Nieuwe gebruiker aanmaken</h4>
+        <input type="text" id="newUsername" placeholder="Nieuwe gebruikersnaam">
+        <input type="password" id="newUserPassword" placeholder="Wachtwoord">
+        <select id="newUserIsAdmin">
+          <option value="false">Gebruiker</option>
+          <option value="true">Admin</option>
+        </select>
+        <button onclick="createAccount()">Account aanmaken</button>
+      </div>
 
-    <hr>
-    <h3>📋 Alle gebruikers</h3>
-    <button onclick="toonGebruikers()">Toon gebruikerslijst</button>
-    <ul id="gebruikerLijst"></ul>
-
-    <hr>
-    <h3>🛑 Eventmodus</h3>
-    <label><input type="checkbox" id="eventToggle" onchange="toggleEvent()"> Zet planningssysteem uit</label>
-    <textarea id="eventReason" placeholder="Geef een reden voor de eventmodus (bv. onderhoud, storing)..."></textarea>
-    <p id="eventMessage" style="color: red; font-weight: bold; display: none;"></p>
+      <h4>Gebruikerslijst</h4>
+      <ul id="usersList"></ul>
+    </div>
   </div>
 
   <script>
-    const users = JSON.parse(localStorage.getItem('users')) || {
+    let users = JSON.parse(localStorage.getItem("users")) || {
       "admin": { password: "admin123", isAdmin: true }
     };
 
+    function saveUsers() {
+      localStorage.setItem("users", JSON.stringify(users));
+    }
+
+    function updateUsersList() {
+      const list = document.getElementById("usersList");
+      list.innerHTML = "";
+      for (const username in users) {
+        const li = document.createElement("li");
+        li.textContent = `${username}${users[username].isAdmin ? " (admin)" : ""}`;
+        list.appendChild(li);
+      }
+    }
+
     function login() {
-      const user = document.getElementById('username').value.trim();
-      const pass = document.getElementById('password').value.trim();
-      if (users[user] && users[user].password === pass) {
-        localStorage.setItem("loggedInUser", user);
-        showUI(user);
+      const username = document.getElementById("loginUsername").value;
+      const password = document.getElementById("loginPassword").value;
+      if (users[username] && users[username].password === password) {
+        localStorage.setItem("loggedInUser", username);
+        showAdminPanel();
       } else {
-        alert("Foute inloggegevens.");
+        alert("Ongeldige inloggegevens");
       }
     }
 
-    function showUI(user) {
-      document.getElementById('loginSection').style.display = 'none';
-      document.getElementById('planningForm').style.display = 'block';
-      if (users[user].isAdmin) {
-        document.getElementById('adminPanel').style.display = 'block';
-      }
-      checkEventStatus();
+    function showAdminPanel() {
+      document.getElementById("adminPanel").style.display = "block";
+      updateUsersList();
     }
 
-    function maakGebruiker() {
-      const newUser = document.getElementById('newUsername').value.trim();
-      const newPass = document.getElementById('newPassword').value.trim();
-      const adminStatus = document.getElementById('isAdmin').checked;
-      if (!newUser || !newPass) return alert("Vul alles in.");
-      users[newUser] = { password: newPass, isAdmin: adminStatus };
-      localStorage.setItem("users", JSON.stringify(users));
-      alert("Gebruiker aangemaakt.");
+    function startEvent() {
+      const name = document.getElementById("eventName").value;
+      alert("Event gestart: " + name);
     }
 
-    function pasWachtwoordAan() {
-      const user = document.getElementById('editUser').value.trim();
-      const newPass = document.getElementById('editPassword').value.trim();
-      if (!users[user]) {
-        alert("Gebruiker bestaat niet.");
+    function createAccount() {
+      const username = document.getElementById("newUsername").value;
+      const password = document.getElementById("newUserPassword").value;
+      const isAdmin = document.getElementById("newUserIsAdmin").value === "true";
+      if (users[username]) {
+        alert("Gebruiker bestaat al!");
         return;
       }
-      users[user].password = newPass;
-      localStorage.setItem("users", JSON.stringify(users));
-      alert("Wachtwoord aangepast.");
+      users[username] = { password: password, isAdmin: isAdmin };
+      saveUsers();
+      updateUsersList();
+      alert("Account aangemaakt!");
     }
 
-    function verwijderGebruiker() {
-      const user = document.getElementById('deleteUser').value.trim();
-      if (!users[user]) {
-        alert("Gebruiker niet gevonden.");
-        return;
-      }
-      if (user === localStorage.getItem("loggedInUser")) {
-        alert("Je kunt jezelf niet verwijderen.");
-        return;
-      }
-      if (!confirm(`Weet je zeker dat je ${user} wilt verwijderen?`)) return;
-      delete users[user];
-      localStorage.setItem("users", JSON.stringify(users));
-      alert(`Gebruiker "${user}" verwijderd.`);
-    }
-
-    function verstuurPlanning() {
-      const stelplaats = document.getElementById('stelplaats').value;
-      const tijd = document.getElementById('tijd').value;
-      const lijn = document.getElementById('lijn').value;
-      const bus = document.getElementById('bus').value;
-      const roblox = document.getElementById('roblox').value;
-      const ritinfo = document.getElementById('ritinfo').value;
-      const gebruiker = localStorage.getItem("loggedInUser");
-
-      const data = {
-        content: `📋 **Nieuwe Planning**\n👤 Verzonden door account: \`${gebruiker}\`\n**Stelplaats:** ${stelplaats}\n**Tijd:** ${tijd}\n**Lijn:** ${lijn}\n**Bus:** ${bus}\n**Roblox Username:** ${roblox}\n**Rit info:** ${ritinfo}`
-      };
-
-      fetch("https://discord.com/api/webhooks/1373258119274037371/Yl07_As--QXXfYkpfnh77ITjYDv-ZcmT_Nd8eXaqmjlf0dVYE4CNOdG3wxOr6G256UAe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      }).then(() => {
-        alert("Planning verzonden naar Discord!");
-      }).catch(() => {
-        alert("Verzenden mislukt.");
-      });
-    }
-
-    function logout() {
-      localStorage.removeItem("loggedInUser");
-      location.reload();
-    }
-
-    function toonGebruikers() {
-      const lijst = document.getElementById('gebruikerLijst');
-      lijst.innerHTML = "";
-      for (let user in users) {
-        const item = document.createElement("li");
-        item.textContent = `👤 ${user} | 🔑 ${users[user].password} | 🛡️ Admin: ${users[user].isAdmin ? "Ja" : "Nee"}`;
-        lijst.appendChild(item);
-      }
-    }
-
-    function toggleEvent() {
-      const status = document.getElementById('eventToggle').checked;
-      const reason = document.getElementById('eventReason').value.trim();
-
-      if (status && reason === "") {
-        alert("Geef een reden voor de eventmodus.");
-        document.getElementById('eventToggle').checked = false;
-        return;
-      }
-
-      localStorage.setItem("eventStatus", status);
-      localStorage.setItem("eventReason", reason);
-      checkEventStatus();
-    }
-
-    function checkEventStatus() {
-      const isEvent = localStorage.getItem("eventStatus") === "true";
-      const reason = localStorage.getItem("eventReason") || "Tijdelijk niet beschikbaar.";
-      const user = localStorage.getItem("loggedInUser");
-      const isAdmin = users[user]?.isAdmin;
-
-      const form = document.getElementById("planningForm");
-      const message = document.getElementById("eventMessage");
-
-      if (isEvent && !isAdmin) {
-        form.style.display = "none";
-        message.style.display = "block";
-        message.innerText = "❗ Plannen is momenteel uitgeschakeld: " + reason;
+    function changePassword() {
+      const username = document.getElementById("changeUser").value;
+      const newPassword = document.getElementById("newPassword").value;
+      if (users[username]) {
+        users[username].password = newPassword;
+        saveUsers();
+        alert("Wachtwoord gewijzigd");
       } else {
-        form.style.display = "block";
-        message.style.display = "none";
-      }
-
-      if (isAdmin) {
-        document.getElementById("eventToggle").checked = isEvent;
-        document.getElementById("eventReason").value = reason;
+        alert("Gebruiker niet gevonden");
       }
     }
 
-    window.onload = function () {
-      const user = localStorage.getItem("loggedInUser");
-      if (user && users[user]) showUI(user);
-    };
+    function deleteAccount() {
+      const username = document.getElementById("deleteUser").value;
+      if (users[username]) {
+        delete users[username];
+        saveUsers();
+        updateUsersList();
+        alert("Account verwijderd");
+      } else {
+        alert("Gebruiker niet gevonden");
+      }
+    }
+
+    // Automatisch inloggen als je al bent ingelogd
+    const loggedInUser = localStorage.getItem("loggedInUser");
+    if (loggedInUser && users[loggedInUser]) {
+      showAdminPanel();
+    }
   </script>
-
 </body>
 </html>
