@@ -9,7 +9,7 @@
     .hidden { display: none; }
     .admin-only { color: darkred; }
     input, select { margin: 5px 0; padding: 5px; width: 100%; }
-    button { padding: 8px 16px; margin-top: 10px; }
+    button { padding: 8px 16px; margin-top: 10px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -60,15 +60,19 @@
   </div>
 
   <script>
-    let users = {
+    let users = JSON.parse(localStorage.getItem("users")) || {
       "admin": { password: "admin123", isAdmin: true },
       "test": { password: "test123", isAdmin: false }
     };
 
-    let webhookURL = "https://discord.com/api/webhooks/1373258119274037371/Yl07_As--QXXfYkpfnh77ITjYDv-ZcmT_Nd8eXaqmjlf0dVYE4CNOdG3wxOr6G256UAe";
+    const webhookURL = "https://discord.com/api/webhooks/1373258119274037371/Yl07_As--QXXfYkpfnh77ITjYDv-ZcmT_Nd8eXaqmjlf0dVYE4CNOdG3wxOr6G256UAe";
+
+    function saveUsers() {
+      localStorage.setItem("users", JSON.stringify(users));
+    }
 
     function login() {
-      const user = document.getElementById("username").value;
+      const user = document.getElementById("username").value.trim();
       const pass = document.getElementById("password").value;
 
       if (users[user] && users[user].password === pass) {
@@ -85,32 +89,50 @@
     }
 
     function toonHoofdscherm() {
-      document.getElementById("loginSection").classList.add("hidden");
-      document.getElementById("mainSection").classList.remove("hidden");
-
       const user = localStorage.getItem("loggedInUser");
-      document.getElementById("loggedInName").textContent = user;
-
-      if (users[user]?.isAdmin) {
-        document.getElementById("adminPanel").classList.remove("hidden");
+      if (!user || !users[user]) {
+        logout();
+        return;
       }
 
-      const eventText = localStorage.getItem("eventText");
-      if (eventText) {
-        document.getElementById("eventText").textContent = eventText;
-        document.getElementById("eventMessage").classList.remove("hidden");
-        document.getElementById("plannerSection").classList.add("hidden");
+      document.getElementById("loginSection").classList.add("hidden");
+      document.getElementById("mainSection").classList.remove("hidden");
+      document.getElementById("loggedInName").textContent = user;
+
+      if (users[user].isAdmin) {
+        document.getElementById("adminPanel").classList.remove("hidden");
+        // Admins zien altijd de planner en geen event blokkade
+        document.getElementById("plannerSection").classList.remove("hidden");
+        document.getElementById("eventMessage").classList.add("hidden");
+      } else {
+        document.getElementById("adminPanel").classList.add("hidden");
+        const eventText = localStorage.getItem("eventText");
+        if (eventText) {
+          // Event actief: toon bericht en verberg planner
+          document.getElementById("eventText").textContent = eventText;
+          document.getElementById("eventMessage").classList.remove("hidden");
+          document.getElementById("plannerSection").classList.add("hidden");
+        } else {
+          // Geen event: toon planner normaal
+          document.getElementById("eventMessage").classList.add("hidden");
+          document.getElementById("plannerSection").classList.remove("hidden");
+        }
       }
     }
 
     function verzend() {
       const gebruiker = localStorage.getItem("loggedInUser");
-      const stelplaats = document.getElementById("stelplaats").value;
-      const van = document.getElementById("tijdVan").value;
-      const tot = document.getElementById("tijdTot").value;
-      const lijn = document.getElementById("lijn").value;
-      const bus = document.getElementById("bus").value;
-      const roblox = document.getElementById("roblox").value;
+      const stelplaats = document.getElementById("stelplaats").value.trim();
+      const van = document.getElementById("tijdVan").value.trim();
+      const tot = document.getElementById("tijdTot").value.trim();
+      const lijn = document.getElementById("lijn").value.trim();
+      const bus = document.getElementById("bus").value.trim();
+      const roblox = document.getElementById("roblox").value.trim();
+
+      if (!stelplaats || !van || !tot || !lijn || !bus || !roblox) {
+        alert("Vul alle velden in voor de ritplanner!");
+        return;
+      }
 
       const content = `🚍 **Rit Ingevuld**\n👤 Gebruiker: ${gebruiker}\n📍 Stelplaats: ${stelplaats}\n🕐 Uren: ${van} - ${tot}\n🚌 Lijn: ${lijn}\n🔢 Bus: ${bus}\n🎮 Roblox: ${roblox}`;
 
@@ -118,9 +140,18 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content })
+      }).then(() => {
+        alert("Verzonden naar Discord!");
+        // Clear planner fields
+        document.getElementById("stelplaats").value = "";
+        document.getElementById("tijdVan").value = "";
+        document.getElementById("tijdTot").value = "";
+        document.getElementById("lijn").value = "";
+        document.getElementById("bus").value = "";
+        document.getElementById("roblox").value = "";
+      }).catch(() => {
+        alert("Fout bij verzenden naar Discord");
       });
-
-      alert("Verzonden naar Discord!");
     }
 
     function toonGebruikers() {
@@ -141,19 +172,34 @@
     }
 
     function voegAccountToe() {
-      const naam = document.getElementById("newUser").value;
+      const naam = document.getElementById("newUser").value.trim();
       const wachtwoord = document.getElementById("newPass").value;
       const isAdmin = document.getElementById("isAdminCheckbox").checked;
 
-      if (!naam || !wachtwoord) return alert("Vul alle velden in");
-      if (users[naam]) return alert("Gebruiker bestaat al");
+      if (!naam || !wachtwoord) {
+        alert("Vul alle velden in");
+        return;
+      }
+      if (users[naam]) {
+        alert("Gebruiker bestaat al");
+        return;
+      }
 
       users[naam] = { password: wachtwoord, isAdmin };
+      saveUsers();
       alert("Gebruiker toegevoegd!");
+      document.getElementById("newUser").value = "";
+      document.getElementById("newPass").value = "";
+      document.getElementById("isAdminCheckbox").checked = false;
+      toonGebruikers();
     }
 
     function zetEvent() {
-      const text = document.getElementById("eventInput").value;
+      const text = document.getElementById("eventInput").value.trim();
+      if (!text) {
+        alert("Voer een reden in voor de blokkade");
+        return;
+      }
       localStorage.setItem("eventText", text);
       alert("Planner geblokkeerd met bericht");
       location.reload();
@@ -165,6 +211,7 @@
       location.reload();
     }
 
+    // Start van de app
     if (localStorage.getItem("loggedInUser")) {
       toonHoofdscherm();
     }
